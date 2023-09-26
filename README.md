@@ -35,10 +35,10 @@ void vmprint(pagetable_t pagetable) {
   vmprint_rec(pagetable, page_directory);
 }  
 ```
-Για το συγκεκριμένο βήμα χρησιμοποιήσα όλα τα απαραίτητα hints που δώθηκαν στην εκφώνηση. Αναλυτικότερα διασχίζω την σελίδα αναδρομικά όπως αναφέρεται στην freewalk. Έχω φτιάξει μια δευτερεύουσα αναδρομική συνάρτηση η οποία καλείται από την vmprint(). Αν το pte «δίχνει» σε κατώτερο επίπεδο τότε τυπώνουμε τις ανάλογες `..` για να δείξουμε ότι αλλάζουμε επίπεδο. Μετά τυπώνουμε τα ζητούμενα στοιχεία για το pte και συνεχίζουμε την αναδρομική κλήση αυξάνοντας το επίπεδο. Αν το pte είναι μόνο valid τότε φτάσαμε στο τελευταίο επίπεδο οπότε τυπώνουμε τις ανάλογες `..` για την εναλλαγή επιπέδου και τα απαραίτητα στοιχεία του pte χωρίς την κλήση της αναδρομικής συνάρτησης.
+For this particular step I used all the necessary hints given in the pronunciation. In more detail I traverse the page recursively as mentioned in `freewalk`. I have made a secondary recursive function which is called by `vmprint()`. If the `pte` "shows" at a lower level then we print the corresponding `..` to show that we are changing the level. Then we print the requested data for `pte` and continue the recursive call increasing the level. If `pte` is only valid then we have reached the last level so we print the corresponding `..` for switching levels and the necessary elements of pte without calling the recursive function.
 
 ### Step 2 – Eliminate allocation from sbrk()
-Η νέα `sbrk` μπορεί να γραφτεί ως εξής: 
+The new `sbrk` can be written as: 
 ```c 
 uint64
 sys_sbrk(void)
@@ -55,18 +55,18 @@ sys_sbrk(void)
   return addr;
 } 
 ```
-Αναλυτικότερα, με την εντολή `addr = myproc()->sz;` αποθηκεύουμε το παλιό μέγεθος της διεργασίας το οποίο θέλουμε και να επιστρέψουμε. Στη συνέχεια, με την εντολή `argint(0, &n);` «φέρνουμε» το μέγεθος n το οποίο θα προστεθεί στο συνολικό μέγεθος της διεργασίας. Τέλος, με την εντολή `myproc()->sz += n` αυξάνουμε το μέγεθος της διεργασίας χωρίς να δεσμεύσουμε μνήμη και έπειτα επιστρέφουμε το αρχικό της μέγεθος.<br/><br/> 
-Ερώτημα:<br/>
-> Το μήνυμα “usertrap(): ...” περιέχεται στο διαχειριστή user traps στο αρχείο
-kernel/trap.c. Αντιμετωπίζει ένα exception που δεν γνωρίζει πώς να το χειριστεί. Θα
-πρέπει να κατανοήσετε γιατί συμβαίνει αυτό το σφάλμα σελίδας. H ένδειξη
-“stval=0x0000000000004008” υποδεικνύει ότι η εικονική διεύθυνση που προκάλεσε το σφάλμα σελίδας είναι η 0x4008. 
+More specifically, with the command `addr = myproc()->sz;` we store the old size of the process which we want to return. Then, with the command `argint(0, &n);` we fetch the size `n` which will be added to the total size of the process. Finally, with the command `myproc()->sz += n` we increase the size of the process without allocating memory and then return its original size.<br/><br/>
+Question:<br/>
+> The “usertrap(): ...” message is from the user trap handler in the
+kernel/trap.c file. It has caught an exception that it does not know how to handle.
+Make sure you understand why this page fault occurs. The
+“stval=0x0000000000004008” indicates that the virtual address that caused the page fault is 0x4008. 
 
-Απάντηση:<br/> 
-> Παρατηρούμε ότι η τιμή του scause είναι 15, η οποία αντιστοιχεί σε σφάλματα σελίδας (page fault). Το σφάλμα σελίδας περιμέναμε να εμφανιστεί αφού η `sbrk` δεν δεσμεύει πραγματικά μια σελίδα. Τέλος, η ένδειξη stval=0x0000000000005008 (η τιμή που έβγαζε στο δικό μου μηχάνημα ήταν διαφορετική από της εκφώνησης) αντιστοιχεί στην εικονική διεύθυνση που προκάλεσαι το σφάλμα σελίδας. 
+Answer:<br/> 
+> We notice that the value of scause is 15, which corresponds to page faults. The page fault we expected to occur since `sbrk` does not actually commit a page. Finally, the stval=0x00000000000005008 (the value on my machine was different from the output) corresponds to the virtual address that causes the page fault
 
 ### Step 3 – Lazy allocation
-Η νέα `sbrk` μπορεί να γραφτεί ως εξής:
+The new `sbrk` can be written as:
 ```c
 uint64
 sys_sbrk(void)
@@ -86,9 +86,9 @@ sys_sbrk(void)
   return addr;
 }
 ```
-Η `sbrk` έχει τροποποιηθεί κατάλληλα ώστε να διαχειρίζεται και αρνητικά ορίσματα. Πιο συγκεκριμένα μετά την ανάθεση της τιμής στο `n` ελέγχουμε αν είναι αρνητικό ή όχι, στην περίπτωση που δεν είναι αρνητικό εκτελείται η εντολή `myproc()->sz += n;` προκειμένου να αυξηθεί το μέγεθος της διεργασίας όπως και στο Βήμα 2. Διαφορετικά, αν το `n` είναι αρνητικό τότε θα αποδεσμεύσουμε τις σελίδες χρήστη ώστε να μικρύνουμε το μέγεθος της διεργασίας το οποίο και αναθέτουμε στο `myproc()->sz` μέσω της `uvmdealloc(...)` η οποία επιστρέφει το νέο μέγεθος της διεργασίας.<br/>
+The `sbrk` has been suitably modified to handle negative arguments as well. More specifically after assigning the value to `n` we check if it is negative or not, in case it is not negative the command `myproc()->sz += n;` is executed in order to increase the size of the process as in Step 2. Otherwise, if `n` is negative then we deallocate the user pages to reduce the size of the process which we assign to `myproc()->sz` via `uvmdealloc(...)` which returns the new process size.<br/>
 
-Αλλαγές έπρεπε να γίνουν και στην `usertrap(...)`.
+Changes had to be made to `usertrap(...)` as well.
 ```c
 else if (r_scause() == 13 || r_scause() == 15) {
     char *mem;
@@ -105,9 +105,9 @@ else if (r_scause() == 13 || r_scause() == 15) {
     }
   }
 ```
-Προκειμένου να αντιμετωπιστεί το ενδεχόμενο η εικονική διεύθυνση να μην έχει μεταφραστεί σε φυσική, η συνάρτηση πρέπει να τροποποιηθεί κατάλληλα ώστε να δεσμεύει τον απαιτούμενο χώρο σελίδας και να κάνει το απαραίτητο mapping, αλλά αν το μέγεθος είναι εκτός ορίων τότε η διεργασία θα «σκοτώνεται» απευθείας. Η διαδικασία δέσμευσης και mapping είναι με αυτήν στην συνάρτηση `uvmalloc()` την οποία παροτρύνει η εκφώνηση να χρησιμοποιήσουμε
+In order to deal with the possibility that the virtual address is not translated to physical, the function must be modified to allocate the required page space and do the necessary mapping, but if the size is out of bounds then the process will be "killed" directly . The binding and mapping process is with the `uvmalloc()` function which I was prompted to use.
 
-Αλλαγές έπρεπε να γίνουν και στην `walkaddr(...)`.
+Changes had to be made to `walkaddr(...)` as well.
 ```c
 uint64
 walkaddr(pagetable_t pagetable, uint64 va)
@@ -141,12 +141,10 @@ walkaddr(pagetable_t pagetable, uint64 va)
   return pa;
 }
 ```
-Για να μπορέσουμε να αντιμετωπίσουμε περίπτωση όπου μία διεργασία περνάει μία έγκυρη διεύθυνση
-από την sbrk() σε μία κλήση συστήματος όπως η read() ή write(), αλλά
-η μνήμη για τη διεύθυνση αυτή δεν έχει ακόμη ανατεθεί πρέπει να τροποποιήσουμε την συνάρτηση `walkaddr(...)`. Αναλυτικότερα, μετά από μια κλήση συστήματος το kernel δεν θα πάει ποτέ στην `usertrap(...)` οπότε το σφάλμα σελίδας πρέπει να αντιμετωπιστεί στην συνάρτηση `walkaddr(...)` την οποία καλεί τόσο η `copyin(...)` όσο και η `copyout(...)` για να μεταφέρει δεδομένα από user σε kernel και το ανάποδο. Η συνάρτηση προηγουμένως ήλεγχε αν το pte υπάρχει ή είναι valid ή είναι προσβάσιμο από user ώστε επιστραφεί 0 αφού δεν επιτρεπόντουσαν, πλέον στο lazy allocation όλα επιτρέπονται οπότε αρκεί να ισχύει εκ των τριων συνθηκών. Επομένως, αν η εικονική διεύθυνση είναι εντός ορίων τότε εκτελείται η διαδικασία δέσμευσης και mapping διαφορετικά επιστρέφεται 0 το οποίο υποδηλώνει ότι δεν επιτεύχθηκε mapped. Τέλος, αν η δέσμευση και το map εκτελέστηκαν επιτυχώς επιστρέφεται η φυσική διεύθυνση.
+To be able to handle the case where a process passes a valid address from `sbrk()` to a system call like `read()` or `write()`, but the memory for this address has not yet been allocated so we need to modify the `walkaddr(...)` function. Specifically, after a system call the kernel will never go to `usertrap(...)` so the page fault must be handled in the `walkaddr(...)` function which is called by both `copyin(... )` as well as `copyout(...)` to transfer data from user to kernel and vice versa. The function previously checked if the `pte` exists or is valid or is accessible by the user so that 0 is returned since they were not allowed, from now on in lazy allocation everything is allowed so it is enough that one of the three conditions apply. Therefore, if the virtual address is within bounds then the binding and mapping process is performed otherwise 0 is returned indicating that no mapping was achieved. Finally, if the bind and map were executed successfully, the physical address is returned.
 
   
-Επιπλέον αλλαγές έγιναν, τόσο στην συνάρτηση `uvmunmap(...)` όσο και στην `uvmcopy(...)`. 
+Additional changes were made to both the `uvmunmap(...)` and `uvmcopy(...)` functions. 
 ```c
 Before:
    if((pte = walk(pagetable, a, 0)) == 0)
@@ -171,4 +169,4 @@ After:
     if((*pte & PTE_V) == 0)
       continue;
 ```
-Όσον αφορά τις αλλαγές `uvmunmap(...)` αλλάζουμε την συνάρτηση και την «καλούμε» να αγνοήσει τις σελίδες που είτε δεν έχουν δημιουργηθεί είτε δεν έχουν γίνει mapped ακόμα. Επιπλέον, η `uvmcopy(...)` χρησιμοποιείται , κυρίως, κατα την διαδικασία της `fork()` οπότε πρέπει να τροποποιηθεί καταλλήλως ώστε να αγνοεί πιθανές σελίδες που είτε δεν έχουν δημιουργηθεί είτε δεν έχουν γίνει mapped ακόμα κατά την αντιγραφή πατέρα-παιδιού. Τέλος, παρατηρούμε ότι η `uvmcopy(...)` καλεί την συνάρτηση `uvmunmap(...)` ώστε να διακόψει την αντιστοιχεία του map σε περίπτωση αποτυχίας δέσμευσης μνήμης όμως, έχουμε ήδ τροποποιήσει την συνάρτηση ώστε να αγνοεί τις αντίστοιχες σελίδες.
+Regarding the `uvmunmap(...)` changes we modified the function and "call" it to ignore pages that are either not created or not mapped yet. In addition, `uvmcopy(...)` is mainly used during the `fork()` process, so it must be modified to ignore possible pages that have either not been created or mapped yet during the parent-child copy. Finally, we notice that `uvmcopy(...)` calls the `uvmunmap(...)` function to stop matching the map in case of memory allocation failure, however, we have already modified the function to ignore the corresponding pages.
